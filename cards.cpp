@@ -5,15 +5,15 @@
 
 using namespace std;
 
-// Animal template { .score = { }, .anchor = , .middle = , {0,0,0,0,0,0} };
-//                                                  {T, TR, BR, B, BL, TL}
+// Animal template { .score={}, .name="", .anchor=, .middle=, {0,0,0,0,0,0} };
+//                                                    {T, TR, BR, B, BL, TL}
 //ANIMAL CARDS
-Animal Gecko { .score =  {0,5,10,16}, .anchor = Direction::BR, .middle = State::Field, {0,0,State::Building2,0,0,State::Field} };
-Animal Shrew { .score = {0,5,10,17}, .anchor = -1, .middle = State::Building2, {0,0,State::Field,0,State::Field,0} };
-Animal Flamingo { .score = {0,4,10,16}, .anchor = -1, .middle = State::River, {0,0,0,0,State::Field,State::Field} };
-Animal Meerkat { .score = {0,2,5,9,14}, .anchor = -1, .middle = State::Mountain1, {0,0,0,0,0,State::Field} };
-Animal Raccoon  { .score = {0,6,12}, .anchor = -1, .middle = State::Field, .neighbors = {0,0,State::River,State::River,State::River,0} };
-Animal Warthog { .score = {0,4,8,13}, .anchor = -1, .middle = State::Tree2, {0,0,0,0,0,State::Building2} };
+Animal Gecko { .score={0,5,10,16}, .name="Gecko", .anchor=Direction::BR, .middle = State::Field, {0,0,State::Building2,0,0,State::Field} };
+Animal Shrew { .score={0,5,10,17}, .name="Shrew", .anchor=-1, .middle=State::Building2, {0,0,State::Field,0,State::Field,0} };
+Animal Flamingo { .score={0,4,10,16}, .name="Flamingo", .anchor=-1, .middle=State::River, {0,0,0,0,State::Field,State::Field} };
+Animal Meerkat { .score={0,2,5,9,14}, .name="Meerkat", .anchor=-1, .middle=State::Mountain1, {0,0,0,0,0,State::Field} };
+Animal Raccoon  { .score={0,6,12}, .name="Raccoon", .anchor=-1, .middle=State::Field, {0,0,State::River,State::River,State::River,0} };
+Animal Warthog { .score={0,4,8,13}, .name="Warthog", .anchor=-1, .middle= State::Tree2, {0,0,0,0,0,State::Building2} };
 
 //SPIRITS
 

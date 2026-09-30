@@ -18,7 +18,7 @@ int read_type(vector<int> stack) {
     tile = {Token::Fields,-1,-1};
     if(stack == tile) return State::Field;
 
-    tile = {Token::Foilage,-1,-1};
+    tile = {Token::Grass,-1,-1};
     if(stack == tile) return State::Bush;
 
     tile = {Token::Trunk,-1,-1};
@@ -30,7 +30,7 @@ int read_type(vector<int> stack) {
     tile = {Token::Mountain,-1,-1};
     if(stack == tile) return State::Mountain1;
 
-    tile = {Token::Trunk,Token::Foilage,-1};
+    tile = {Token::Trunk,Token::Grass,-1};
     if(stack == tile) return State::Tree2;
 
     tile = {Token::Trunk,Token::Trunk,-1};
@@ -46,7 +46,7 @@ int read_type(vector<int> stack) {
     tile = {Token::Mountain,Token::Mountain,-1};
     if(stack == tile) return State::Mountain2;
 
-    tile = {Token::Trunk,Token::Trunk,Token::Foilage};
+    tile = {Token::Trunk,Token::Trunk,Token::Grass};
     if(stack == tile) return State::Tree3;
 
     tile = {Token::Mountain,Token::Mountain,Token::Mountain};

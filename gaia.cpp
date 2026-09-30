@@ -8,9 +8,6 @@
 
 using namespace std;
 
-//RNG
-mt19937 rng{random_device{}()};
-
 //FUNCTIONS
 // initializes the token bag
 vector<int> init_token_bag(vector<int> tilecounts) {
@@ -23,13 +20,14 @@ vector<int> init_token_bag(vector<int> tilecounts) {
 }
 
 // removes the 'select' pool and restocks the board from the bag
-void select_token_pool(vector<vector<int>> &token_board, vector<int> &token_bag, int select) {
+vector<int> select_token_pool(vector<vector<int>> &token_board, vector<int> &token_bag, int select) {
+    vector<int> pool = token_board[select];
     token_board[select].clear();
     for(int i = 0; i < pool_size && !token_bag.empty(); i++) {
         token_board[select].push_back(token_bag.back());
         token_bag.pop_back();
     } 
-    return;
+    return pool;
 }
 
 // initializes the token board
@@ -61,7 +59,7 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     fill(mask.begin(),mask.end(),0);
     for(int i = 0; i < nodes; i++) {
         
-        vector<int> non_stackable = {Token::Fields, Token::Water, Token::Foilage};
+        vector<int> non_stackable = {Token::Fields, Token::Water, Token::Grass};
         if(find(non_stackable.begin(), non_stackable.end(), status[i].stack[0]) != non_stackable.end()) continue;
 
         if(status[i].stack[0] == -1) { mask[i] = 1; continue; } //stack is empty
@@ -82,7 +80,7 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
                 if(status[i].stack[0] == -1) mask[i] = 1;
                 break;
             
-            case Token::Foilage: 
+            case Token::Grass: 
                 if(skim_top(status[i]) == Token::Trunk) mask[i] = 1;
                 break;
             
@@ -103,11 +101,15 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     }
 }
 
-int main() {
+//DEBUG STUFFF!!!!
+/*int main() {
+    
+    return 0;
+
+    
     // initial animal deck
     vector<Animal> card_deck = {Gecko, Shrew, Flamingo, Meerkat, Raccoon, Warthog};
-
-    /*
+    
     cout << "Neighborhood graph: \n";
     for(int i = 0; i < nodes; i++) {
         cout << i << ": ";
@@ -115,7 +117,7 @@ int main() {
             cout << node << " ";
         }
         cout << "\n";
-    } */
+    } 
 
     vector<int> bag = init_token_bag(token_counts);
     cout << "\nBag contents(before init): (size=" << bag.size() << ")\n";
@@ -124,7 +126,7 @@ int main() {
 
     vector<vector<int>> tboard = init_token_board(pool_count,bag);
     cout << "Token board: \n";
-    for(int i = 0; i < 5; i++) {
+    for(int i = 0; i < pool_count; i++) {
         cout << i << ": ";
         for(auto node : tboard[i]){
             cout << node << " ";
@@ -138,10 +140,10 @@ int main() {
     
     // debug board from the HAR_rules pdf
     vector<Tile> board_status(nodes);
-    vector<int> t = {Token::Fields, Token::Fields, Token::Water, Token::Water, Token::Foilage, Token::Water, 
+    vector<int> t = {Token::Fields, Token::Fields, Token::Water, Token::Water, Token::Grass, Token::Water, 
         Token::Water, Token::Fields, Token::Water, Token::Water, Token::Trunk, Token::Building, Token::Fields, 
         Token::Fields, Token::Water, Token::Fields, Token::Mountain, Token::Building, Token::Mountain, Token::Trunk, 
-        Token::Foilage, Token::Mountain, Token::Mountain, Token::Mountain, Token::Mountain, Token::Mountain, 
+        Token::Grass, Token::Mountain, Token::Mountain, Token::Mountain, Token::Mountain, Token::Mountain, 
         Token::Building, Token::Building, Token::Mountain, Token::Mountain};
     vector<int> n = {0,1,2,3,4,5,6,7,8,9,10,10,11,12,13,14,15,15,16,17,17,18,18,18,19,20,21,21,22,22};
     
@@ -156,7 +158,7 @@ int main() {
     for(int j = 0; j < order.size(); j++) {
         if(n[order[j]] == 10 && t[order[j]] == Token::Building && board_status[n[order[j]]].state_id() == State::Empty ||
             n[order[j]] == 15 && t[order[j]] == Token::Building && board_status[n[order[j]]].state_id() == State::Empty ||
-            n[order[j]] == 17 && t[order[j]] == Token::Foilage && board_status[n[order[j]]].state_id() == State::Empty) {
+            n[order[j]] == 17 && t[order[j]] == Token::Grass && board_status[n[order[j]]].state_id() == State::Empty) {
             order.push_back(order[j]); 
         } else {
             place_token(t[order[j]], n[order[j]], board_status);
@@ -193,14 +195,14 @@ int main() {
 
     // 1s on 1 and 7
 
-    /*
-    Expected score:
-    Trees {1,3,0}
-    Mountains {3,0,7}
-    Fields {10}
-    River {7}
-    Buildings {10}
-    */
+    
+    //Expected score:
+    //Trees {1,3,0}
+    //Mountains {3,0,7}
+    //Fields {10}
+    //River {7}
+    //Buildings {10}
+    
     cout << "[t  ]\n";
     cout << "[w  ]\n";
     cout << "[b  ]\n";
@@ -220,7 +222,7 @@ int main() {
     cout << " /000\\       /005\\       /010\\\n";
     cout << "| ttg |     | mb  |     | w   |\n";
     cout << " \\ x / /003\\ \\ x / /008\\ \\ x /\n";
-    cout << "   |  | g   |  |  | w   |  |   \n";
+    cout << "   |  | w   |  |  | w   |  |   \n";
     cout << " /001\\ \\ x / /006\\ \\ x / /011\\\n";
     cout << "| g   |  |  |     |  |  | bb  |\n";
     cout << " \\ x / /004\\ \\ x / /009\\ \\ x /\n";
@@ -230,7 +232,7 @@ int main() {
     cout << " \\ x /       \\ x /       \\ x /\n";
 
     return 0;
-}
+}*/
 
 /*
 columns = 3
