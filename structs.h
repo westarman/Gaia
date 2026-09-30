@@ -15,7 +15,7 @@ const int pool_count = 5;
 const int max_tile_stack = 3; //dont change this...xD
 
 //GRAPH
-const int cols = 3, colsize = 5; // pls have at least two columns, bitte :praying_hands:
+const int cols = 3, colsize = 5; // pls have at least 2 columns and size above 1, bitte 🙏 (otherwise it explodes)
 const int nodes = cols*colsize + (cols-1)*(colsize-1); // ! - mustnt exceed 1000
 extern const std::vector<std::vector<int>> board;
 

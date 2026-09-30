@@ -63,7 +63,7 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
         if(find(non_stackable.begin(), non_stackable.end(), status[i].stack[0]) != non_stackable.end()) continue;
 
         if(status[i].stack[0] == -1) { mask[i] = 1; continue; } //stack is empty
-        if(status[i].stack[3] != -1) continue; //stack is full
+        if(status[i].stack[2] != -1) continue; //stack is full
 
         switch(token) {
             

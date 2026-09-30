@@ -104,7 +104,7 @@ enum Menu : int {
 };
 
 enum Order : int {
-    PickPool, PickCard, PlaceToken, PlaceAnchor, ViewToken, ViewAnchor
+    PickPool, PickCard, PlaceToken, PlaceAnchor, ViewToken, ViewAnchor, EndTurn
 };
 
 int state = Menu::MainMenu;
@@ -115,12 +115,13 @@ vector<int> tbag(0);
 vector<vector<int>> tboard(0);
 vector<Animal> card_deck(0);
 int max_card_board = 2;
+int max_player_cards = 3;
 
 //per player
 vector<Tile> board_status(0);
 vector<Animal> player_cards(0);
-int max_player_cards = 3;
 vector<int> player_tokens(0);
+bool tokens_picked = false;
 
 
 void print_title() {
@@ -170,23 +171,23 @@ void print_token(int t) {
         break;
         
         case Token::Fields:
-        cout << "\33[38;5;226m" << "  Field w  " << "\33[0m";
+        cout << "\33[38;5;226m" << "  Field  = " << "\33[0m";
         break;
     
         case Token::Grass:
-        cout << "\33[38;5;46m" << " Grass ;,; " << "\33[0m";
+        cout << "\33[38;5;46m" << "  Grass  w " << "\33[0m";
         break;
         
         case Token::Mountain:
-        cout << "\33[38;5;242m" << "Mountain /\\" << "\33[0m";
+        cout << "\33[38;5;242m" << "Mountain A " << "\33[0m";
         break;
         
         case Token::Trunk:
-        cout << "\33[38;5;94m" << "  Trunk @  " << "\33[0m";
+        cout << "\33[38;5;94m" << "  Trunk  @ " << "\33[0m";
         break;
     
         case Token::Water:
-        cout << "\33[38;5;33m" << "  Water ~  " << "\33[0m";
+        cout << "\33[38;5;33m" << "  Water  ~ " << "\33[0m";
         break;
     }
 }
@@ -195,19 +196,35 @@ void print_token_pools() {
     //TODO make board print out in columns instead of rows
     cout << "Token pools: \n";
     for(int i = 0; i < pool_count; i++) {
-        cout << i << ": | ";
+        cout << i+1 << ": | ";
         for(int node : tboard[i]){
             print_token(node);
             cout << " | ";
         }
         cout << "\n";
     }
-    cout << "\nSelect a token pool.\n";
+    cout << '\n'<< "\33[1m" << "Select a token pool.\n" << "\33[0m";
 }
 
 void print_player_tokens() {
+    cout << "Your tokens: | ";
+    if(player_tokens.empty()) { cout << "\33[2m" << "empty\n" << "\33[0m"; return; }
+    for(int x : player_tokens) {
+        print_token(x);
+        cout  << " | ";
+    }
+    cout << '\n';
+}
+
+void print_card_board() {
     //TODO
-    cout << "printed player tokens\n";
+    cout << "printed cards\n";
+}
+
+void print_new_turn() {
+    //TODO
+    cout << "_____________________________________________________________________________\n";
+    cout << "turn 16\n";
 }
 
 string triple0(int n) {
@@ -321,6 +338,7 @@ void print_board(vector<int> mask) {
     cout << "\n\n";
 }
 
+// returns an anchor mask of the current board
 vector<int> anchor_status() {
     vector<int> anchors(nodes);
     for(int i = 0; i < nodes; i++) {
@@ -333,12 +351,25 @@ vector<int> anchor_status() {
     return anchors;
 }
 
+int char_to_token(char c) {
+    switch(c) {
+        case 'B': return Token::Building;
+        case 'F': return Token::Fields;
+        case 'G': return Token::Grass;
+        case 'M': return Token::Mountain;
+        case 'T': return Token::Trunk;
+        case 'W': return Token::Water;
+        default: return -1; //invalid token
+    }
+}
+
 // mainmenu substate
 void mainmenu(int in) {
     switch(in) {
         case 1:
             state = Menu::GameStart;
             //TODO printout settings for gamestart
+            cout << "\33[1m" << "Press enter to start.\n" << "\33[0m";
             break;    
         case 2:
             cout << "not implemented yet...\n\n";
@@ -348,7 +379,7 @@ void mainmenu(int in) {
             break;
         case 4:
             cout << "\033[38;5;1mWARNING: Nuclear launch detected! ETA: 3s\n";
-            this_thread::sleep_for(chrono::milliseconds(500));
+            this_thread::sleep_for(chrono::milliseconds(800));
             for(int i = 3; i>0; i--) {
                 cout << i << "...\n";
                 this_thread::sleep_for(chrono::seconds(1));
@@ -363,11 +394,11 @@ void mainmenu(int in) {
 
 // gameloop substate
 void mainturn(int order, vector<string> &in) {
-    if(player_tokens.empty() && order != Order::PickPool) {
+    if(!tokens_picked && order != Order::PickPool) {
         cout << "Please select a token pool first.\n";
         return;
     }
-        //pick pool <- 'pick id'
+        //pick pool <- 'id'
         //place token <- 'place t id'
         //place animal <- 'place name id'
         //view valid tokens <- 'view t'
@@ -377,31 +408,96 @@ void mainturn(int order, vector<string> &in) {
         //help
 
     switch(order) {
-    case Order::PickPool:
-        if(in[1][0] < '1' || in[1][0] > (pool_size+1+'0')) {
-            cout << "\033[38;5;1m" << "! - invalid token pool, a value in range 1-" << pool_count << " is required\n\n" << "\033[0m";
-            return;
-        }
-        player_tokens = select_token_pool(tboard,tbag,stoi(in[1])-1);
-        print_board(anchor_status());
-        print_player_tokens();
-        break;
-    
-    case Order::PlaceToken:
+        case Order::PickPool:
+            player_tokens = select_token_pool(tboard,tbag,stoi(in[0])-1);
+            tokens_picked = true;
+            print_board(anchor_status());
+            print_player_tokens();
+            break;
+        
+        case Order::PlaceToken: {
+            int t = char_to_token(in[1][0]);
+            int n; size_t pos;
+            
+            if(player_tokens.empty())  {
+                cout <<"\033[38;5;1m" << "! - you don't have any tokens, end your turn to pick new ones\n\n" << "\033[0m";
+                return;
+            }
+            try {
+                n = stoi(in[2], &pos);
+                if(pos != in[2].size()) {
+                    cout << "\033[38;5;1m" << "! - invalid hex input\n\n" << "\033[0m";
+                    return;
+                }
+            } catch(...) {
+                cout << "\033[38;5;1m" << "! - thats not a hex number buddy\n\n" << "\033[0m";
+                return;
+            }
 
-        break;
+            if(t < 0 || in[1].size() > 1) { cout << "\033[38;5;1m" << "! - no such token exists\n\n" << "\033[0m"; return; }
+            if(n > nodes-1 || n < 0) { cout << "\033[38;5;1m" << "! - invalid hex position \n\n" << "\033[0m"; return; }
+            
+            vector<int> mask(nodes);
+            placement_mask(t, board_status, mask);
+            if(!mask[n]) { cout << "\033[38;5;1m" << "! - this token can't be placed here\n\n" << "\033[0m"; return; }
 
-    default:
-        break;
+            //remove token from player pool (this has to be last otherwise it deletes the token prematurely)
+            bool flag = true;
+            vector<int> tmp;
+            for(int i = 0; i < player_tokens.size(); i++) { 
+                if(player_tokens[i]==t && flag) flag = false;
+                else tmp.push_back(player_tokens[i]);
+            }
+            player_tokens = tmp;
+            if(flag) { cout << "\033[38;5;1m" << "! - you don't have this token\n\n" << "\033[0m"; return; }
+
+            place_token(t,n,board_status);
+            print_board(anchor_status());
+            print_player_tokens();
+            break; }
+        
+        case Order::EndTurn:
+            //TODO endgame check?
+
+            print_new_turn();
+            print_card_board();
+            //print player cards
+            print_board(anchor_status());
+            print_token_pools();
+            tokens_picked = false;
+            break;
+        
+        default:
+            cout << "ouch\n";
+            break;
     }
 }
 
-// only determines which order is given (validity is checked later)
+// only determines which order is given
 int give_order(vector<string> &in) {
     string o = in[0];
-    if(o == "pick") {
+    if(in.size() == 1 && !tokens_picked) { //select pool
+        int n; size_t pos;
+        try {
+            n = stoi(in[0], &pos);
+            if(pos != in[0].size()) {
+                cout << "\033[38;5;1m" << "! - invalid input\n\n" << "\033[0m";
+                return -1;
+            }
+            if(n < 1 || n > pool_count+1) {
+                cout << "\033[38;5;1m" << "! - invalid token pool, a value in range 1-" << pool_count << " is required\n\n" << "\033[0m";
+                return -1;
+            }
+        } catch(...) {
+                cout << "\033[38;5;1m" << "! - thats not a number buddy\n\n" << "\033[0m";
+                return -1;
+            }
         return Order::PickPool;
+
     } else if(o == "place") {
+        if(in.size()<2) { cout << "\033[38;5;1m" << "! - no token/animal was given\n\n" << "\033[0m"; return -1; }
+        if(in.size()<3) { cout << "\033[38;5;1m" << "! - no hex position was given\n\n" << "\033[0m"; return -1; }
+
         if(in[1].size() > 1) {
             return Order::PlaceAnchor;
         } else {
@@ -410,7 +506,8 @@ int give_order(vector<string> &in) {
     } else if(o == "view") {
         //TODO
     } else if(o == "end") {
-        //TODO
+        if(!player_tokens.empty()) { cout << "\033[38;5;1m" << "! - you must place all tokens before ending your turn\n\n" << "\033[0m"; return -1; }
+        return Order::EndTurn;
     } else {
         cout << "\033[38;5;1m" << "! - no order named '" << o << "'\n\n" << "\033[0m";
         return -1;
@@ -423,11 +520,17 @@ void state_machine(vector<string> &in) {
     switch(state) {
 
         case Menu::MainMenu: {
-            if(in[0][0] < '1' || in[0][0] > '4' || in.size()>1 || in[0].size()>1) {
-                cout << "\033[38;5;1m" << "! - invalid input\n\n" << "\033[0m";
+            int n; size_t pos;
+            try {
+                n = stoi(in[0], &pos);
+                if(n < 1 || n > 4 || in.size()>1 || pos != in[0].size()) {
+                    cout << "\033[38;5;1m" << "! - invalid input\n\n" << "\033[0m";
+                    return;
+                }
+            } catch(...) {
+                cout << "\033[38;5;1m" << "! - thats not a number buddy\n\n" << "\033[0m";
                 return;
             }
-            int n = stoi(in[0]);
             mainmenu(n);
             break; }
         
@@ -443,30 +546,33 @@ void state_machine(vector<string> &in) {
             
             const Tile t;
             for(int i = 0; i < nodes; i++) board_status.push_back(t);
-
+            
+            print_card_board();
             print_token_pools();
             state = MainTurn;
             break; }
         
         case Menu::Settings:
+        
             break;
         
-
         case Menu::MainTurn: {
-            // picks pool(special check)
-            // user can pick cards, place tokens, place anchors as well as view valid placements
-            // end turn option
-            // MainTurn -> TokenSelection OR MainTurn -> EndGame
+            // select pool
+            // user can take cards, place tokens, place anchors as well as view valid placements
+            // end turn
+            // MainTurn -> MainTurn OR MainTurn -> EndGame
 
             int order = give_order(in);
             if(order<0) return;
             mainturn(order,in);
             break; }
+
         case Menu::EndGame:
             //post game screen
             //scoring, clearing memory etc.
             // EndGame -> MainMenu
             break;
+        
         default:
             cout << "wtf\n";
             break;
@@ -474,6 +580,7 @@ void state_machine(vector<string> &in) {
 } 
 
 int main() {
+    //TODO make previous cmd autocomplete
     string input;
     vector<string> tokens;
     
