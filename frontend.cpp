@@ -104,7 +104,7 @@ enum Menu : int {
 };
 
 enum Order : int {
-    PickPool, PickCard, PlaceToken, PlaceAnchor, ViewToken, ViewAnchor, EndTurn
+    PickPool, PickCard, PlaceToken, PlaceAnchor, ViewToken, ViewAnchor, ClearView, EndTurn
 };
 
 int state = Menu::MainMenu;
@@ -113,16 +113,119 @@ int state = Menu::MainMenu;
 //one only
 vector<int> tbag(0);
 vector<vector<int>> tboard(0);
-vector<Animal> card_deck(0);
-int max_card_board = 2;
+vector<Animal> card_deck(0); //we take cards from the top
+int max_card_board = 5;
 int max_player_cards = 3;
+int turn = 0;
 
 //per player
 vector<Tile> board_status(0);
 vector<Animal> player_cards(0);
+vector<Animal> complete_cards(0);
 vector<int> player_tokens(0);
 bool tokens_picked = false;
 
+string color(int i) {
+    if(i==-1) return "\033[39m"; //default terminal color
+    return "\33[38;5;" + to_string(i) + "m"; 
+}
+
+string bold() {
+    return "\33[1m";
+}
+
+string nofont() {
+    return "\33[0m";
+}
+
+string triple0(int n) {
+    string s = "000";
+    s[2] = n % 10 + '0';
+    n/=10;
+    s[1] = n % 10 + '0';
+    n/=10;
+    s[0] = n % 10 + '0';
+    return s;
+}
+
+string stack_chars(vector<int> stack) {
+    string s = "\33[1m";
+    for(int x : stack) {
+        switch(x) {
+            case Token::Building:
+                s.append("\33[38;5;160mB");
+                break;
+            case Token::Fields:
+                s.append("\33[38;5;226mF");
+                break;
+            case Token::Grass:
+                s.append("\33[38;5;46mG");
+                break;
+            case Token::Mountain:
+                s.append("\33[38;5;242mM");
+                break;
+            case Token::Trunk:
+                s.append("\33[38;5;94mT");
+                break;
+            case Token::Water:
+                s.append("\33[38;5;33mW");
+                break;
+            default:
+                s.append(" ");
+                break;
+        }
+    }
+    s.append("\33[0m");
+    return s;
+}
+
+// only includes finished states used in cards (also it doesnt account for the building quirk)
+vector<int> tile_to_stack(int tile_state) {
+    switch(tile_state) {
+        case State::River:
+            return {Token::Water,-1,-1};
+        case State::Field:
+            return {Token::Fields,-1,-1};
+        case State::Bush:
+            return {Token::Grass,-1,-1};
+        case State::Building2:
+            return {Token::Building,Token::Building,-1};
+        case State::Tree2:
+            return {Token::Trunk,Token::Grass,-1};
+        case State::Tree3:
+            return {Token::Trunk,Token::Trunk,Token::Grass};
+        case State::Mountain1:
+            return {Token::Mountain,-1,-1};
+        case State::Mountain2:
+            return {Token::Mountain,Token::Mountain,-1};
+        case State::Mountain3:
+            return {Token::Mountain,Token::Mountain,Token::Mountain};
+        default:
+            cout << "invalid tile state?\n";
+            return {};
+    }
+} 
+
+int char_to_token(char c) {
+    switch(c) {
+        case 'B': return Token::Building;
+        case 'F': return Token::Fields;
+        case 'G': return Token::Grass;
+        case 'M': return Token::Mountain;
+        case 'T': return Token::Trunk;
+        case 'W': return Token::Water;
+        default: return -1; //invalid token
+    }
+}
+
+void clear_terminal() {
+    cout << "\033[2J\033[3J\033[H" << flush;
+}
+
+void print_turn_delimination() {
+    cout << "\n__________________________________ Turn: " << turn << " ___________________________________\n\n";
+
+}
 
 void print_title() {
     cout << "\n\n\n";
@@ -216,59 +319,159 @@ void print_player_tokens() {
     cout << '\n';
 }
 
-void print_card_board() {
-    //TODO
-    cout << "printed cards\n";
-}
+// prints first 'n' cards from deck, if 'n' is not provided it prints all cards
+void print_cards(vector<Animal> cards, int n = -1) {
+    if(n==-1 || n > cards.size()) n = cards.size();
+    if(cards.size()==0) { cout << "no cards\n"; return; }
+    /*
+        CARD FORMAT
+      __           __ 
+     |  xxxxxxxxxxx  |
+    
+        Score:        
+        xxxxxxxxxxx 
 
-void print_new_turn() {
-    //TODO
-    cout << "_____________________________________________________________________________\n";
-    cout << "turn 16\n";
-}
+             o        
+      [xxx][xxx][xxx] 
+        o  \ | /  o   
+           [xxx]o     
+        o  / | \  o   
+      [xxx][xxx][xxx] 
+     |__     o     __|
 
-string triple0(int n) {
-    string s = "000";
-    s[2] = n % 10 + '0';
-    n/=10;
-    s[1] = n % 10 + '0';
-    n/=10;
-    s[0] = n % 10 + '0';
-    return s;
-}
+      __           __
+     |     GECKO     |
+    
+        Score:
+        2 5 8 12 17   
 
-string stack(int n) {
-    string s = "\33[1m";
-    for(int x : board_status[n].stack) {
-        switch(x) {
-            case Token::Building:
-                s.append("\33[38;5;160mB");
-                break;
-            case Token::Fields:
-                s.append("\33[38;5;226mF");
-                break;
-            case Token::Grass:
-                s.append("\33[38;5;46mG");
-                break;
-            case Token::Mountain:
-                s.append("\33[38;5;242mM");
-                break;
-            case Token::Trunk:
-                s.append("\33[38;5;94mT");
-                break;
-            case Token::Water:
-                s.append("\33[38;5;33mW");
-                break;
-            default:
-                s.append(" ");
-                break;
+                       
+      [F  ]          
+           \         
+           [F  ]    
+               \  o 
+                [BB ] 
+     |__           __|
+
+    */
+
+    for(int i = 0; i < n; i++) cout << "  __           __ ";
+    cout << '\n';
+
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        string card_name = card.name;
+        
+        if(card_name.size() > 11) { //larger name than format allows
+            card_name.resize(11);
+        } else { //recenter name
+            int offset = 11-card_name.size();
+            offset /= 2;
+            card_name.clear();
+            for(int j = 0; j < offset; j++) card_name.push_back(' ');
+            card_name.append(card.name);
+            while(card_name.size() != 11) card_name.append(" ");
         }
+
+        cout << " |  ";
+        cout << bold() << card_name << nofont();
+        cout << "  |";
     }
-    s.append("\33[0m");
-    return s;
+    cout << '\n' << '\n';
+
+    for(int i = 0; i < n; i++) {
+        cout << "    Score:        ";
+    }
+    cout << '\n';
+
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "    " << color(46);
+        string score = "";
+        bool endcolor = true;
+        for(int i = 0; i < card.score.size(); i++) {
+            int x = card.score[i];
+            if(x==0) continue;
+            
+            if(endcolor && i>card.uses) score.append(nofont()), endcolor=false;
+            string value = to_string(x);
+            if(score.size()+value.size()+1 > 16) { // 11+5 due to nofont()
+                cout << color(226) << "warning - card '" << card.name << "' has to many score deliminations\n" << nofont();
+                break;
+            }
+            if(score.size() != 0) score.append(" ");
+            score.append(value);
+        }
+        if(score.size()<16) {
+            int offset = score.size();
+            for(int j = 0; j < 16-offset; j++) score.append(" ");
+        }
+        cout << score;
+        cout << "   ";
+    }
+    cout << '\n' << '\n';
+    
+    for(int i = 0; i < n; i++) {
+        cout << "         " << (cards[i].anchor == Direction::T ? color(208)+"o"+nofont() : " ") << "        ";
+    }
+    cout << '\n';
+
+    // TL T TR
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "  " << (card.neighbors[5] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[5])) + "]");
+        cout << (card.neighbors[0] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[0])) + "]");
+        cout << (card.neighbors[1] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[1])) + "]") << " ";
+    }
+    cout << '\n';
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "    " << (card.anchor == Direction::TL ? color(208)+"o"+nofont() : " ");
+        cout << "  " << (card.neighbors[5] == 0 ? " " : "\\") << (card.neighbors[0] == 0 ? "   " : " | ") << (card.neighbors[1] == 0 ? " " : "/") << "  ";
+        cout << (card.anchor == Direction::TR ? color(208)+"o"+nofont() : " ") << "   ";
+    }
+    cout << '\n';
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "       " << "[" + stack_chars(tile_to_stack(card.middle)) + "]" << (card.anchor == -1 ? color(208)+"o"+nofont() : " ") << "     ";
+    }
+    cout << '\n';
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "    " << (card.anchor == Direction::BL ? color(208)+"o"+nofont() : " ");
+        cout << "  " << (card.neighbors[4] == 0 ? " " : "/") << (card.neighbors[3] == 0 ? "   " : " | ") << (card.neighbors[2] == 0 ? " " : "\\") << "  ";
+        cout << (card.anchor == Direction::BR ? color(208)+"o"+nofont() : " ") << "   ";
+    }
+    cout << '\n';
+
+    // BL B BR
+    for(int i = 0; i < n; i++) {
+        Animal card = cards[i];
+        cout << "  " << (card.neighbors[4] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[4])) + "]");
+        cout << (card.neighbors[3] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[3])) + "]");
+        cout << (card.neighbors[2] == 0 ? "     " : "[" + stack_chars(tile_to_stack(card.neighbors[2])) + "]") << " ";
+    }
+    cout << '\n';
+
+    for(int i = 0; i < n; i++) {
+        cout << " |__     " << (cards[i].anchor == Direction::B ? color(208)+"o"+nofont() : " ") << "     __|";
+    }
+    cout << '\n';
+
+
+    cout << '\n';
 }
 
-void print_board(vector<int> mask) {
+// the anchor acts as a sort of state view of the board
+void print_board(
+    vector<int> mask, 
+    char anchor_shape = 'o', 
+    int anchor_color = 208,
+    char Aanchor_shape = ' ',
+    int Aanchor_color = -1) {
+
+        string aShape (1,anchor_shape), AShape (1,Aanchor_shape); 
+
     //
     //0: " /xxx\\      "
     //1: "| xxx |     "
@@ -287,53 +490,53 @@ void print_board(vector<int> mask) {
     cout << '\n';
 
     //1
-    for(int i = 0; i < cols; i++) cout << "| " << stack((2*colsize-1)*i) << " |     "; 
+    for(int i = 0; i < cols; i++) cout << "| " << stack_chars(board_status[(2*colsize-1)*i].stack) << " |     "; 
     cout << '\n';
 
     //2
-    cout << " \\ " << (mask[0] ? "o" : " ")  << " /";
-    for(int i = 1; i < cols; i++) cout << " /" << triple0(colsize*i+(colsize-1)*(i-1)) << "\\ \\ " << (mask[(2*colsize-1)*i] ? "o" : " ") << " /";
+    cout << " \\ " << (mask[0] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont()  << " /";
+    for(int i = 1; i < cols; i++) cout << " /" << triple0(colsize*i+(colsize-1)*(i-1)) << "\\ \\ " << (mask[(2*colsize-1)*i] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont() << " /";
     cout << '\n';
 
     //3452
     for(int i = 1; i < colsize-1; i++) {
         //3
         cout << "   |  ";
-        for(int j = 1; j < cols; j++) cout << "| " << stack(colsize*j+(colsize-1)*(j-1)+(i-1)) << " |  |  ";
+        for(int j = 1; j < cols; j++) cout << "| " << stack_chars(board_status[colsize*j+(colsize-1)*(j-1)+(i-1)].stack) << " |  |  ";
         cout << '\n';
 
         //4
         cout << " /" << triple0(i) << "\\";
-        for(int j = 1; j < cols; j++) cout << " \\ " << (mask[colsize*j+(colsize-1)*(j-1)+(i-1)] ? "o" : " ") << " / /" << triple0((2*colsize-1)*j+i) << "\\";
+        for(int j = 1; j < cols; j++) cout << " \\ " << (mask[colsize*j+(colsize-1)*(j-1)+(i-1)] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont() << " / /" << triple0((2*colsize-1)*j+i) << "\\";
         cout << '\n';
         
         //5
-        cout << "| " << stack(i) << " |";
-        for(int j = 1; j < cols; j++) cout << "  |  | " << stack((2*colsize-1)*j+i) << " |";
+        cout << "| " << stack_chars(board_status[i].stack) << " |";
+        for(int j = 1; j < cols; j++) cout << "  |  | " << stack_chars(board_status[(2*colsize-1)*j+i].stack) << " |";
         cout << '\n';
 
         //2
-        cout << " \\ " << (mask[i] ? "o" : " ")  << " /";
-        for(int j = 1; j < cols; j++) cout << " /" << triple0(colsize*j+(colsize-1)*(j-1)+i) << "\\ \\ " << (mask[(2*colsize-1)*j+i] ? "o" : " ") << " /";
+        cout << " \\ " << (mask[i] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont()  << " /";
+        for(int j = 1; j < cols; j++) cout << " /" << triple0(colsize*j+(colsize-1)*(j-1)+i) << "\\ \\ " << (mask[(2*colsize-1)*j+i] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont() << " /";
         cout << '\n';
     }
 
     //3
     cout << "   |  ";
-    for(int i = 1; i < cols; i++) cout << "| " << stack(colsize*i+(colsize-1)*(i-1)+(colsize-2)) << " |  |  ";
+    for(int i = 1; i < cols; i++) cout << "| " << stack_chars(board_status[colsize*i+(colsize-1)*(i-1)+(colsize-2)].stack) << " |  |  ";
     cout << '\n';
 
     //4
     cout << " /" << triple0(colsize-1) << "\\";
-    for(int i = 1; i < cols; i++) cout << " \\ " << (mask[colsize*i+(colsize-1)*(i-1)+(colsize-2)] ? "o" : " ") << " / /" << triple0((2*colsize-1)*i+(colsize-1)) << "\\";
+    for(int i = 1; i < cols; i++) cout << " \\ " << (mask[colsize*i+(colsize-1)*(i-1)+(colsize-2)] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont() << " / /" << triple0((2*colsize-1)*i+(colsize-1)) << "\\";
     cout << '\n';
     
     //1
-    for(int i = 0; i < cols; i++) cout << "| " << stack((2*colsize-1)*i+(colsize-1)) << " |     "; 
+    for(int i = 0; i < cols; i++) cout << "| " << stack_chars(board_status[(2*colsize-1)*i+(colsize-1)].stack) << " |     "; 
     cout << '\n';
 
     //6
-    for(int i = 0; i < cols; i++) cout << " \\ " << (mask[(2*colsize-1)*i+(colsize-1)] ? "o" : " ") << " /      ";
+    for(int i = 0; i < cols; i++) cout << " \\ " << (mask[(2*colsize-1)*i+(colsize-1)] ? color(anchor_color)+aShape : color(Aanchor_color)+AShape)+nofont() << " /      ";
 
     cout << "\n\n";
 }
@@ -349,18 +552,6 @@ vector<int> anchor_status() {
         }
     }
     return anchors;
-}
-
-int char_to_token(char c) {
-    switch(c) {
-        case 'B': return Token::Building;
-        case 'F': return Token::Fields;
-        case 'G': return Token::Grass;
-        case 'M': return Token::Mountain;
-        case 'T': return Token::Trunk;
-        case 'W': return Token::Water;
-        default: return -1; //invalid token
-    }
 }
 
 // mainmenu substate
@@ -392,7 +583,7 @@ void mainmenu(int in) {
     }
 }
 
-// gameloop substate
+// gameloop substate(executes orders)
 void mainturn(int order, vector<string> &in) {
     if(!tokens_picked && order != Order::PickPool) {
         cout << "Please select a token pool first.\n";
@@ -408,13 +599,60 @@ void mainturn(int order, vector<string> &in) {
         //help
 
     switch(order) {
-        case Order::PickPool:
+
+        case Order::PickPool: {
             player_tokens = select_token_pool(tboard,tbag,stoi(in[0])-1);
             tokens_picked = true;
+
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
+            print_board(anchor_status());
+            print_player_tokens();
+            break; }
+        
+        case Order::PickCard: {
+            if(player_cards.size() == max_player_cards) {
+                cout << "\033[38;5;1m" << "! - you can only have " << max_player_cards << " cards at a time\n\n" << "\033[0m";
+                return;
+            }
+            string card_name = in[1];
+            int draw_size = (max_card_board > card_deck.size() ? card_deck.size() : max_card_board);
+            for(int i = 0; i<player_cards.size(); i++) {
+                if(card_name == player_cards[i].name) {
+                    cout << "\033[38;5;1m" << "! - you already have this card\n\n" << "\033[0m";
+                    return;
+                }
+            }
+
+            for(int i = 0; i < draw_size; i++) {
+                if(card_name == card_deck[i].name) {
+                    player_cards.push_back(card_deck[i]);
+                    card_deck.erase(card_deck.begin()+i);
+                    break;
+                }
+                if(i == draw_size-1) {
+                    cout << "\033[38;5;1m" << "! - this card isn't available or no such card exists\n\n" << "\033[0m";
+                    return;
+                }
+            }
+
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
             print_board(anchor_status());
             print_player_tokens();
             break;
-        
+        }
+
         case Order::PlaceToken: {
             int t = char_to_token(in[1][0]);
             int n; size_t pos;
@@ -452,20 +690,156 @@ void mainturn(int order, vector<string> &in) {
             if(flag) { cout << "\033[38;5;1m" << "! - you don't have this token\n\n" << "\033[0m"; return; }
 
             place_token(t,n,board_status);
+            for(auto &card : card_deck) update_anchor_positions(card, board_status,n);
+            for(auto &card : player_cards) update_anchor_positions(card, board_status,n);
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
             print_board(anchor_status());
             print_player_tokens();
-            break; }
-        
-        case Order::EndTurn:
-            //TODO endgame check?
+            break;
+        }
 
-            print_new_turn();
-            print_card_board();
-            //print player cards
+        case Order::PlaceAnchor: {
+            string anchor = in[1];
+            int n; size_t pos;
+            try {
+                n = stoi(in[2], &pos);
+                if(pos != in[2].size()) {
+                    cout << "\033[38;5;1m" << "! - invalid hex input\n\n" << "\033[0m";
+                    return;
+                }
+            } catch(...) {
+                cout << "\033[38;5;1m" << "! - thats not a hex number buddy\n\n" << "\033[0m";
+                return;
+            }
+
+            if(n > nodes-1 || n < 0) { cout << "\033[38;5;1m" << "! - invalid hex position \n\n" << "\033[0m"; return; }
+
+            for(auto &card : player_cards) {
+                if(card.name == anchor) {
+                    if(card.placement[n] == 1) { 
+                        board_status[n].animal=1;
+                        card.uses++;
+                        
+                        //animal used up check
+                        if(card.uses == card.score.size()-1) {
+                            complete_cards.push_back(card);
+                            player_cards.erase(player_cards.begin()+(&card - &player_cards[0]));
+                        }
+
+                        anchor = "flag"; 
+                    } else { cout << "\033[38;5;1m" << "! - you can't place this animal here\n\n" << "\033[0m"; return;}
+                    break;
+                }
+
+            }
+
+            if(anchor!="flag") { cout << "\033[38;5;1m" << "! - you don't have this animal card or it doesn't exist\n\n" << "\033[0m"; return; }
+
+            for(auto &card : card_deck) update_anchor_positions(card, board_status,n);
+            for(auto &card : player_cards) update_anchor_positions(card, board_status,n);
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
+            print_board(anchor_status());
+            print_player_tokens();
+            break;
+        }
+        
+        case Order::ViewToken: {
+            int t = char_to_token(in[1][0]);
+            if(t < 0 || in[1].size() > 1) { cout << "\033[38;5;1m" << "! - no such token exists\n\n" << "\033[0m"; return; }
+
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
+
+            vector<int> m(nodes);
+            placement_mask(t,board_status,m);
+            print_board(m,'o',46,'x',1);
+            
+            print_player_tokens();
+            break;
+        }
+
+        case Order::ViewAnchor: {
+            string a = in[1];
+            Animal A;
+
+            int draw_size = (max_card_board > card_deck.size() ? card_deck.size() : max_card_board);
+            for(int i = 0; i < draw_size && A.name == ""; i++) {
+                if(a == card_deck[i].name)  A = card_deck[i];
+            }
+            for(int i = 0; i < player_cards.size() && A.name == ""; i++) {
+                if(a == player_cards[i].name)  A = player_cards[i];
+            }
+
+            if(A.name == "") { cout << "\033[38;5;1m" << "! - this animal isn't available or doesn't exists\n\n" << "\033[0m"; return;}
+
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
+
+            print_board(A.placement,'o',46,'x',1);
+            
+            print_player_tokens();
+            break;
+        }
+
+        case Order::ClearView: {
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
+            print_board(anchor_status());
+            print_player_tokens();
+            cout << "\nReset anchor/token view.\n";
+            break; 
+        }
+
+        case Order::EndTurn: {
+            
+            int empty_tile = 0;
+            for(Tile t : board_status) if(t.state_id() == State::Empty) empty_tile++;
+            if(tbag.empty() || empty_tile < 3) { 
+                cout << bold() << "You have completed the game! Press Enter to view your score.\n";
+                state = Menu::EndGame; 
+                return;
+            }
+            
+            turn++;
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
+            cout << "YOUR CARDS:\n";
+            print_cards(player_cards);
+            cout << "\nCompleted cards: " << complete_cards.size() << '\n';
             print_board(anchor_status());
             print_token_pools();
             tokens_picked = false;
             break;
+        }
         
         default:
             cout << "ouch\n";
@@ -473,7 +847,7 @@ void mainturn(int order, vector<string> &in) {
     }
 }
 
-// only determines which order is given
+// determines which order is given and failsafes the metadata of the order(the content of the order is dealt with in execution)
 int give_order(vector<string> &in) {
     string o = in[0];
     if(in.size() == 1 && !tokens_picked) { //select pool
@@ -494,6 +868,9 @@ int give_order(vector<string> &in) {
             }
         return Order::PickPool;
 
+    } else if(o == "take") {
+        if(in.size()<2) { cout << "\033[38;5;1m" << "! - no animal name was given\n\n" << "\033[0m"; return -1; }
+        return Order::PickCard;
     } else if(o == "place") {
         if(in.size()<2) { cout << "\033[38;5;1m" << "! - no token/animal was given\n\n" << "\033[0m"; return -1; }
         if(in.size()<3) { cout << "\033[38;5;1m" << "! - no hex position was given\n\n" << "\033[0m"; return -1; }
@@ -504,7 +881,13 @@ int give_order(vector<string> &in) {
             return Order::PlaceToken;
         }
     } else if(o == "view") {
-        //TODO
+        if(in.size()==1) {
+            return Order::ClearView;
+        } else if(in[1].size() == 1) {
+            return Order::ViewToken;
+        } else {
+            return Order::ViewAnchor;
+        }
     } else if(o == "end") {
         if(!player_tokens.empty()) { cout << "\033[38;5;1m" << "! - you must place all tokens before ending your turn\n\n" << "\033[0m"; return -1; }
         return Order::EndTurn;
@@ -543,11 +926,14 @@ void state_machine(vector<string> &in) {
             shuffle(card_deck.begin(), card_deck.end(), rng);
             tbag = init_token_bag(token_counts);
             tboard = init_token_board(pool_count, tbag);
-            
+            turn = 1;
             const Tile t;
             for(int i = 0; i < nodes; i++) board_status.push_back(t);
             
-            print_card_board();
+            clear_terminal();
+            print_turn_delimination();
+            cout << "AVAILABLE CARDS:\n";
+            print_cards(card_deck, max_card_board);
             print_token_pools();
             state = MainTurn;
             break; }
@@ -567,12 +953,56 @@ void state_machine(vector<string> &in) {
             mainturn(order,in);
             break; }
 
-        case Menu::EndGame:
+        case Menu::EndGame: {
             //post game screen
             //scoring, clearing memory etc.
             // EndGame -> MainMenu
+            clear_terminal();
+            cout << bold() << "\n__________________________________ GAME COMPLETE ___________________________________\n\n" << nofont();
+            cout << "Game length: " << turn << " turns\n\n";
+
+            int t=0, m=0, b=0, f=0, r=0, a=0;
+            vector<int> tmp;
+            tmp = tree_score(board_status);
+            for(int x : tmp) t += x;
+            tmp = mountain_score(board_status);
+            for(int x : tmp) m += x;
+            b = building_score(board_status);
+            f = fields_score(board_status);
+            r = river_score(board_status);
+
+            for(auto card : complete_cards) a += card.score.back();
+            for(auto card : player_cards) a += card.score[card.uses];
+
+            cout << bold() << "YOUR SCORE: \n" << nofont();
+            cout << color(46) << "  Trees and bushes: " << nofont() << bold() << t << nofont() << '\n';
+            cout << color(242) << "Mountain and hills: " << nofont() << bold() << m << nofont() << '\n';
+            cout << color(160) << "         Buildings: " << nofont() << bold() << b << nofont() << '\n';
+            cout << color(226) << "            Fields: " << nofont() << bold() << f << nofont() << '\n';
+            cout << color(33) << "  Rivers and lakes: " << nofont() << bold() << r << nofont() << "\n\n";
+
+            cout << color(208) << "   Animal habitats: " << nofont() << bold() << a << nofont();
+            cout << " ( ";
+            for(auto card : complete_cards) cout << card.name << '-' << card.score[card.uses] << " ";
+            cout << ") " << '\n';
+            cout << "Your unfinished habitats: ( ";
+            for(auto card : player_cards) cout << card.name << '-' << card.score[card.uses] << " ";
+            cout << ") " << '\n';
+            cout << "-------------------- TOTAL SCORE: " << bold() << t+m+b+f+r+a << nofont() << " --------------------\n\n\n";
+
+            cout << "Your habitat board: \n";
+            print_board(anchor_status());
+
+            cout  << "Press Enter to return to the Main Menu.\n";
+            state = Menu::MainMenu;
+            string input;
+            getline(cin,input);
+            clear_terminal();
+            print_title();
+            print_main_menu();
             break;
-        
+        }
+
         default:
             cout << "wtf\n";
             break;
@@ -596,4 +1026,3 @@ int main() {
     }
     return 0;
 }
-

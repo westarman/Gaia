@@ -61,7 +61,7 @@ struct Animal { // the shape is limited to one hex and its neighbors
     int anchor; // -1 if middle
     int middle; // middle tile type
     vector<int> neighbors = vector<int>(6);
-    vector<bool> placement = vector<bool>(nodes,false);
+    vector<int> placement = vector<int>(nodes,0);
 };
 
 //ANIMALS
@@ -71,7 +71,6 @@ extern Animal Flamingo;
 extern Animal Meerkat; 
 extern Animal Raccoon;  
 extern Animal Warthog; 
-
 
 //FUNCTION HEADERS
 //backend

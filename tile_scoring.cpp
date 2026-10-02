@@ -65,6 +65,7 @@ vector<int> mountain_score(vector<Tile> &status) {
 }
 
 int building_score(vector<Tile> &status) {
+    //this has a bug... something with trees,trunks and bushes
     int score = 0;
     for(int i = 0; i < status.size(); i++) {
         unordered_set<int> uniques(0);

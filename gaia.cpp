@@ -62,6 +62,7 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
         vector<int> non_stackable = {Token::Fields, Token::Water, Token::Grass};
         if(find(non_stackable.begin(), non_stackable.end(), status[i].stack[0]) != non_stackable.end()) continue;
 
+        if(status[i].animal || status[i].spirit) continue; //theres an anchor present
         if(status[i].stack[0] == -1) { mask[i] = 1; continue; } //stack is empty
         if(status[i].stack[2] != -1) continue; //stack is full
 
@@ -101,11 +102,10 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     }
 }
 
+/*
 //DEBUG STUFFF!!!!
-/*int main() {
+int main() {
     
-    return 0;
-
     
     // initial animal deck
     vector<Animal> card_deck = {Gecko, Shrew, Flamingo, Meerkat, Raccoon, Warthog};
@@ -155,7 +155,7 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     //it basically makes a random placement order of the above board set, its different each time and
     //it makes sure it doesnt make a few possible illegal stacks
     //horribly inefficient and non-expandable xD
-    for(int j = 0; j < order.size(); j++) {
+    /*for(int j = 0; j < order.size(); j++) {
         if(n[order[j]] == 10 && t[order[j]] == Token::Building && board_status[n[order[j]]].state_id() == State::Empty ||
             n[order[j]] == 15 && t[order[j]] == Token::Building && board_status[n[order[j]]].state_id() == State::Empty ||
             n[order[j]] == 17 && t[order[j]] == Token::Grass && board_status[n[order[j]]].state_id() == State::Empty) {
@@ -164,8 +164,27 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
             place_token(t[order[j]], n[order[j]], board_status);
             for(int i = 0; i < card_deck.size(); i++) { update_anchor_positions(card_deck[i], board_status,n[order[j]]); }
         }
+    }*/
+   
+    /*
+    place_token(Token::Mountain,0,board_status);
+    update_anchor_positions(card_deck[3], board_status,0);
+    place_token(Token::Fields,1,board_status);
+    update_anchor_positions(card_deck[3], board_status,1);
+
+
+    cout << "                         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2\n";
+    for(int i = 0; i < card_deck.size(); i++) {
+        cout << "Card " <<  card_deck[i].name << " anchor positions: "; 
+        for(bool x : card_deck[i].placement) {
+            cout << x << " ";
+        }
+        cout << '\n';
     }
-    
+
+    // 1s on 1 and 7
+
+
     vector<int> tscore = tree_score(board_status);
     cout << "\nTree score: ";
     for(int x : tscore) cout << x << " ";
@@ -183,56 +202,16 @@ void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     cout << "Placement order: ";
     for(int x : order) cout << x << " ";
     cout << "\n\n";
-    
-    cout << "                         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2\n";
-    for(int i = 0; i < card_deck.size(); i++) {
-        cout << "Card " << i << " anchor positions: "; 
-        for(bool x : card_deck[i].placement) {
-            cout << x << " ";
-        }
-        cout << '\n';
-    }
 
-    // 1s on 1 and 7
-
-    
     //Expected score:
     //Trees {1,3,0}
     //Mountains {3,0,7}
     //Fields {10}
     //River {7}
     //Buildings {10}
-    
-    cout << "[t  ]\n";
-    cout << "[w  ]\n";
-    cout << "[b  ]\n";
-    cout << "[m  ]\n";
-    cout << "[f  ]\n";
-    cout << "[g  ]\n";
-    cout << "[tt ]\n";
-    cout << "[tb ]\n";
-    cout << "[bb ]\n";
-    cout << "[mb ]\n";
-    cout << "[tg ]\n";
-    cout << "[ttg]\n";
-    cout << "[mmm]\n";
-    cout << "[   ]\n";
-    // "1 5 1 5(empty) 1 5 ... 5 1 \n"
-    //6 "      "
-    cout << " /000\\       /005\\       /010\\\n";
-    cout << "| ttg |     | mb  |     | w   |\n";
-    cout << " \\ x / /003\\ \\ x / /008\\ \\ x /\n";
-    cout << "   |  | w   |  |  | w   |  |   \n";
-    cout << " /001\\ \\ x / /006\\ \\ x / /011\\\n";
-    cout << "| g   |  |  |     |  |  | bb  |\n";
-    cout << " \\ x / /004\\ \\ x / /009\\ \\ x /\n";
-    cout << "   |  | f   |  |  | w   |  |   \n";
-    cout << " /002\\ \\ x / /007\\ \\ x / /012\\\n";
-    cout << "| f   |     |     |     | w   |\n";
-    cout << " \\ x /       \\ x /       \\ x /\n";
 
     return 0;
-}*/
+}
 
 /*
 columns = 3
