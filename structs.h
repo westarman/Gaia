@@ -74,6 +74,7 @@ extern Animal Warthog;
 
 //FUNCTION HEADERS
 //backend
+int skim_top(Tile t);
 int read_type(vector<int> stack);
 vector<vector<int>> board_constructor(int columns, int colsize);
 void update_anchor_positions (Animal &card, vector<Tile> &status, int node);

@@ -70,7 +70,7 @@ int building_score(vector<Tile> &status) {
     for(int i = 0; i < status.size(); i++) {
         unordered_set<int> uniques(0);
         if(status[i].state_id() == State::Building2) {
-            for(int neighbor : board[i]) if(neighbor >= 0) uniques.insert(status[neighbor].state_id());
+            for(int neighbor : board[i]) if(neighbor >= 0) uniques.insert(skim_top(status[neighbor]));
             if(uniques.size() > 2) score += 5;
         }
     }
