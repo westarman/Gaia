@@ -65,12 +65,9 @@ struct Animal { // the shape is limited to one hex and its neighbors
 };
 
 //ANIMALS
-extern Animal Gecko; 
-extern Animal Shrew; 
-extern Animal Flamingo; 
-extern Animal Meerkat; 
-extern Animal Raccoon;  
-extern Animal Warthog; 
+extern Animal Gecko, Shrew, Flamingo, Meerkat, Raccoon, Warthog, Ladybug, Frog, Koala, Duck, Bat, Fish, Squirrel, Otter, FennecFox,
+              Rabbit, Alligator, MantaRay, Wolf, Parrot, Penguin, Peacock, ArcticFox, Kingfisher, Falcon, Alpaca, Panther, Raven,
+              BrownBear, ArcticMonkey, Hedgehog, Bumblebee;
 
 //FUNCTION HEADERS
 //backend
