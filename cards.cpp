@@ -25,7 +25,7 @@ Animal Fish { .score={0,3,6,10,16}, .name="Fish", .anchor=-1, .middle=State::Riv
 Animal Squirrel { .score={0,4,9,15}, .name="Squirrel", .anchor=-1, .middle=State::Building2, {0,0,0,0,0,State::Tree3} };
 Animal Otter { .score={0,5,10,16}, .name="Otter", .anchor=Direction::BR, .middle=State::Bush, {0,0,State::River,0,0,State::Bush} };
 Animal FennecFox { .score={0,4,9,16}, .name="FennecFox", .anchor=Direction::BR, .middle=State::Mountain1, {0,0,State::Mountain1,0,0,State::Field} };
-Animal Rabbit { .score={0,5,10,17}, .name="Rabbits", .anchor=Direction::BR, .middle=State::Bush, {0,0,State::Bush,0,0,State::Building2} };
+Animal Rabbit { .score={0,5,10,17}, .name="Rabbit", .anchor=Direction::BR, .middle=State::Bush, {0,0,State::Bush,0,0,State::Building2} };
 Animal Alligator { .score={0,4,9,15}, .name="Alligator", .anchor=Direction::BR, .middle=State::River, {0,0,State::River,0,0,State::Tree3} };
 Animal MantaRay { .score={0,4,10,16}, .name="MantaRay", .anchor=-1, .middle=State::River, {0,0,0,0,State::Mountain1,State::Mountain1} };
 Animal Wolf { .score={0,4,10,16}, .name="Wolf", .anchor=-1, .middle=State::Tree3, {0,0,0,0,State::Field,State::Field} };
@@ -128,8 +128,3 @@ void update_anchor_positions(Animal &card, vector<Tile> &status, int node) {
         }
     }
 }
-
-// 13 14 18 {19 20} {26 27} {28 29}
-
-// 0:
-// 13 27 28 18 26

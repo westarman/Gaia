@@ -54,7 +54,7 @@ int skim_top(Tile t) {
     return -1;
 }
 
-// returns mask for valid token placement
+// returns mask for valid token placement, mask needs proper size, but doesnt need to be fresh
 void placement_mask(int token, vector<Tile> &status, vector<int> &mask) {
     fill(mask.begin(),mask.end(),0);
     for(int i = 0; i < nodes; i++) {

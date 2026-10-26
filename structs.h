@@ -9,6 +9,11 @@ using std::string;
 //RNG
 inline std::mt19937 rng{std::random_device{}()};
 
+inline int rand_int(int l, int h) { //inclusive on both sides
+    std::uniform_int_distribution<int> d(l,h);
+    return d(rng);
+}
+
 //GLOBALS
 const int pool_size = 3;
 const int pool_count = 5;

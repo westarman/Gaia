@@ -112,6 +112,7 @@ int state = Menu::MainMenu;
 //GAME MEMORY
 int max_card_board = 5;
 int max_player_cards = 5;
+int players = 4;
 
 struct Player {
     vector<Tile> board_status;
@@ -125,7 +126,7 @@ struct Game {
     int turn = 0;
     vector<int> tbag;
     vector<vector<int>> tboard;
-    vector<Animal> card_deck; //we take cards from the top
+    vector<Animal> card_deck; //we take cards from the bottom
     vector<Player> players;
 
 };
@@ -753,8 +754,8 @@ void mainturn(int order, vector<string> &in, Game &game) {
 
             if(anchor!="flag") { cout << "\033[38;5;1m" << "! - you don't have this animal card or it doesn't exist\n\n" << "\033[0m"; return; }
 
-            for(auto &card : game.card_deck) update_anchor_positions(card, user.board_status,n);
-            for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status,n);
+            for(auto &card : game.card_deck) update_anchor_positions(card, user.board_status, n);
+            for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status, n);
             clear_terminal();
             print_turn_delimination(game.turn);
             cout << "AVAILABLE CARDS:\n";
@@ -939,31 +940,147 @@ void init_game(Game &game) {
         Rabbit, Alligator, MantaRay, Wolf, Parrot, Penguin, Peacock, ArcticFox, Kingfisher, Falcon, Alpaca, Panther, Raven,
         BrownBear, ArcticMonkey, Hedgehog, Bumblebee};
     shuffle(game.card_deck.begin(), game.card_deck.end(), rng);
+    
     game.tbag = init_token_bag(token_counts);
     game.tboard = init_token_board(pool_count, game.tbag);
     game.turn = 1;
 
-    int players = 1;
     for(int i = 0; i < players; i++) { Player player; game.players.push_back(player); }
+    
     const Tile t;
     for(Player &player : game.players) {
         for(int i = 0; i < nodes; i++) player.board_status.push_back(t);
     }
 }
+
+void print_player_score(Player &user, int playerID) {
+    int t=0, m=0, b=0, f=0, r=0, a=0;
+    vector<int> tmp;
+    tmp = tree_score(user.board_status);
+    for(int x : tmp) t += x;
+    tmp = mountain_score(user.board_status);
+    for(int x : tmp) m += x;
+    b = building_score(user.board_status);
+    f = fields_score(user.board_status);
+    r = river_score(user.board_status);
+
+    for(auto card : user.complete_cards) a += card.score.back();
+    for(auto card : user.player_cards) a += card.score[card.uses];
+
+    cout << bold() << "PLAYER " << playerID << " SCORE: \n" << nofont();
+    cout << color(46) << "  Trees and bushes: " << nofont() << bold() << t << nofont() << '\n';
+    cout << color(242) << "Mountain and hills: " << nofont() << bold() << m << nofont() << '\n';
+    cout << color(160) << "         Buildings: " << nofont() << bold() << b << nofont() << '\n';
+    cout << color(226) << "            Fields: " << nofont() << bold() << f << nofont() << '\n';
+    cout << color(33) << "  Rivers and lakes: " << nofont() << bold() << r << nofont() << "\n\n";
+
+    cout << color(208) << "   Animal habitats: " << nofont() << bold() << a << nofont();
+    cout << " ( ";
+    for(auto card : user.complete_cards) cout << card.name << '-' << card.score[card.uses] << " ";
+    cout << ") " << '\n';
+    cout << "Your unfinished habitats: ( ";
+    for(auto card : user.player_cards) cout << card.name << '-' << card.score[card.uses] << " ";
+    cout << ") " << '\n';
+    cout << "TOTAL SCORE: " << bold() << t+m+b+f+r+a << nofont() << "\n\n\n";
+}
+
 // main simulation execution
 void simulate() {
+    cout << " we made it A\n";
     //1 game
     // 5 possible actions per turn: pickPool, pickCard, placeToken, placeAnchor, endTurn
     // at minimum 4 mandatory decisions, picking the pool and placing 3 tokens (location for each)
     // each decision is masked
     // non-mandatory decisions have a 'skip' option
-    //init_game();
+    Game game;
+    init_game(game);
+    bool end_game = false;
 
+    vector<int> turn_order; // player turn order
+    for(int i = 0; i < players; i++)  turn_order.push_back(i);
+    shuffle(turn_order.begin(), turn_order.end(), rng);
+    
+    while(!end_game) {
+        for(int playerID : turn_order) {
+            Player &user = game.players[playerID];
+    
+            //AGENT IMPLEMENTATION GOES HERE
+    
+    
+            //RANDOM AGENT:
+            // picks pool at random, always fills up card slots selecting at random, places anchors whenever able
+            // places tokens in random order and random tiles
+    
+            //pick pool
+            user.player_tokens = select_token_pool(game.tboard, game.tbag, rand_int(0,4));
+            user.tokens_picked = true;
+    
+            //one of three placeToken,placeAnchor,pickCard (masked decisions)
+            vector<int> t_order; // random token placement order
+            for(int i = 0; i < 3; i++)  t_order.push_back(i);
+            shuffle(t_order.begin(), t_order.end(), rng);
+    
+            for(int t : t_order) {
+                vector<int> mask(nodes);
+                placement_mask(user.player_tokens[t], user.board_status, mask);
+                vector<int> valid(0);
+                for(int i = 0; i < nodes; i++) { if(mask[i])valid.push_back(i); }
+                if(valid.empty()) cout << "ERROR: valid placement was empty, EXITING SIMULATION!", exit(1);
+                int tile = valid[rand_int(0,valid.size()-1)]; //random token placement tile
+                place_token(user.player_tokens[t], tile, user.board_status);
+                for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status,tile);
+    
+                while(user.player_cards.size() != max_player_cards) {
+                    int draw_size = (max_card_board > game.card_deck.size() ? game.card_deck.size() : max_card_board);
+                    int i = rand_int(0,draw_size-1); //random card selection fill
+                    for(int n = 0; n < nodes; n++) update_anchor_positions(game.card_deck[i], user.board_status, n);
+                    user.player_cards.push_back(game.card_deck[i]);
+                    game.card_deck.erase(game.card_deck.begin()+i);
+                }
+    
+                //auto place possible anchors
+                for(auto &card : user.player_cards) {
+                    for(int i = 0; i < nodes; i++) {
+                        if(card.placement[i]) {
+                            user.board_status[i].animal=1;
+                            card.uses++;
+    
+                            //animal used up check
+                            if(card.uses == card.score.size()-1) {
+                                user.complete_cards.push_back(card);
+                                user.player_cards.erase(user.player_cards.begin()+(&card - &user.player_cards[0]));
+                            }
+    
+                            for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status, i);
+                        }
+                        
+                    }
+                }
+    
+            }
+            user.player_tokens.clear();
+            user.tokens_picked = false;
+    
+            //end turn 
+            if(&game.players[playerID] == &game.players.back()) game.turn++;
 
+            int empty_tile = 0;
+            for(Tile t : user.board_status) if(t.state_id() == State::Empty) empty_tile++;
+            if(game.tbag.empty() || empty_tile < 3) end_game = true;
+        }
+
+    }
+
+    //PRINTOUT
+    clear_terminal();
+    cout << bold() << "\n__________________________________ GAME COMPLETE ___________________________________\n\n" << nofont();
+    cout << "Game length: " << game.turn << " turns\n\n";
+    for(int i = 0; i < game.players.size(); i++) print_player_score(game.players[i],i);
 
 }
 
 Game game; // we assume the user is player 0
+//put this in main and probbly pass it to statemachine?
 
 // the main interface state function
 void state_machine(vector<string> &in) {
@@ -1064,17 +1181,27 @@ void state_machine(vector<string> &in) {
 
         case Menu::SimSettings: {
             state = Menu::Simulation;
+            cout << "pending settings...\n";
             break;
         }
         
         case Menu::Simulation: {
             simulate();
+            cout  << "Press Enter to return to the Main Menu.\n";
+            state = Menu::MainMenu;
+            string input;
+            getline(cin,input);
+            clear_terminal();
+            print_title();
+            print_main_menu();
             break;
         }
 
-        case Menu::Settings:
-        
-        break;
+        //TODO
+        case Menu::Settings:  {
+
+            break;
+        }
 
         default:
             cout << "wtf\n";
