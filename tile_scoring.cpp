@@ -110,30 +110,29 @@ int fields_score(vector<Tile> &status) {
 
 //a graph diameter algorithm using BFS
 int river_score(vector<Tile> &status) {
-    int max = 0;
+    int max = 0; //longest shortest path among any 2 nodes
     vector<int> rivers = find_types(State::River, status);
 
     //BFS to find longest length
     for(int river : rivers) {
         queue<int> Q;
         Q.push(river);
-        vector<bool> visited(nodes,false);
-        visited[river] = true;
-        int length = 1;
-        vector<bool> layer(nodes,false);
+        vector<int> d(nodes,-1); //-1 means not visited
+        d[river] = 0;
         while (!(Q.empty())) {
             int u = Q.front(); Q.pop();
             for(int neighbor : board[u]) {
                 if(neighbor < 0 || status[neighbor].state_id() != State::River) continue;
-                if(!(visited[neighbor])) {
-                    visited[neighbor] = true;
+                if(d[neighbor] == -1) {
+                    d[neighbor] = d[u] + 1;
                     Q.push(neighbor);
-                    if(!(layer[u])) length++; layer[u]=true; // this is for proper counting the length by layer
+                    max = max > d[neighbor] ? max : d[neighbor];
+                    
                 }
             }
         }
-        if(length > max) max = length;
     }   
+    max++; //due to counting nodes and not edges
 
     //Scoring the length
     int score;

@@ -984,98 +984,303 @@ void print_player_score(Player &user, int playerID) {
     cout << "TOTAL SCORE: " << bold() << t+m+b+f+r+a << nofont() << "\n\n\n";
 }
 
+string recenter(int cap, string s) {
+    string tmp = s;
+    int offset = cap-s.size();
+    offset /= 2;
+    s.clear();
+    for(int j = 0; j < offset; j++) s.push_back(' ');
+    s.append(tmp);
+    while(s.size() != cap) s.append(" ");
+    return s;
+}
+
+string format_dec(string v) {
+    v.resize(v.find('.') + 3);
+    return v;
+}
+
+void print_progress(int current, int total, int bar_width = 50) {
+    float frac = (float)current / total;
+    int filled = (int)(frac * bar_width);
+
+    std::cout << "\r[";
+    for (int i = 0; i < bar_width; ++i) std::cout << (i < filled ? '#' : ' ');
+    std::cout << "] " << int(frac * 100) << "%" << std::flush;
+}
+
 // main simulation execution
-void simulate() {
-    cout << " we made it A\n";
-    //1 game
-    // 5 possible actions per turn: pickPool, pickCard, placeToken, placeAnchor, endTurn
-    // at minimum 4 mandatory decisions, picking the pool and placing 3 tokens (location for each)
-    // each decision is masked
-    // non-mandatory decisions have a 'skip' option
-    Game game;
-    init_game(game);
-    bool end_game = false;
+void simulate(int games) {
 
-    vector<int> turn_order; // player turn order
-    for(int i = 0; i < players; i++)  turn_order.push_back(i);
-    shuffle(turn_order.begin(), turn_order.end(), rng);
-    
-    while(!end_game) {
-        for(int playerID : turn_order) {
-            Player &user = game.players[playerID];
-    
-            //AGENT IMPLEMENTATION GOES HERE
-    
-    
-            //RANDOM AGENT:
-            // picks pool at random, always fills up card slots selecting at random, places anchors whenever able
-            // places tokens in random order and random tiles
-    
-            //pick pool
-            user.player_tokens = select_token_pool(game.tboard, game.tbag, rand_int(0,4));
-            user.tokens_picked = true;
-    
-            //one of three placeToken,placeAnchor,pickCard (masked decisions)
-            vector<int> t_order; // random token placement order
-            for(int i = 0; i < 3; i++)  t_order.push_back(i);
-            shuffle(t_order.begin(), t_order.end(), rng);
-    
-            for(int t : t_order) {
-                vector<int> mask(nodes);
-                placement_mask(user.player_tokens[t], user.board_status, mask);
-                vector<int> valid(0);
-                for(int i = 0; i < nodes; i++) { if(mask[i])valid.push_back(i); }
-                if(valid.empty()) cout << "ERROR: valid placement was empty, EXITING SIMULATION!", exit(1);
-                int tile = valid[rand_int(0,valid.size()-1)]; //random token placement tile
-                place_token(user.player_tokens[t], tile, user.board_status);
-                for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status,tile);
-    
-                while(user.player_cards.size() != max_player_cards) {
-                    int draw_size = (max_card_board > game.card_deck.size() ? game.card_deck.size() : max_card_board);
-                    int i = rand_int(0,draw_size-1); //random card selection fill
-                    for(int n = 0; n < nodes; n++) update_anchor_positions(game.card_deck[i], user.board_status, n);
-                    user.player_cards.push_back(game.card_deck[i]);
-                    game.card_deck.erase(game.card_deck.begin()+i);
-                }
-    
-                //auto place possible anchors
-                for(auto &card : user.player_cards) {
-                    for(int i = 0; i < nodes; i++) {
-                        if(card.placement[i]) {
-                            user.board_status[i].animal=1;
-                            card.uses++;
-    
-                            //animal used up check
-                            if(card.uses == card.score.size()-1) {
-                                user.complete_cards.push_back(card);
-                                user.player_cards.erase(user.player_cards.begin()+(&card - &user.player_cards[0]));
-                            }
-    
-                            for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status, i);
-                        }
-                        
+    struct Stats {
+        // 0 = AVG | 1 = MAX | 2 = SUM
+        // the average is obsolete, i forgot it needs a decimal :/
+        vector<int> singleGame = vector<int> (3,0);
+        vector<int> doneC = vector<int> (3,0); 
+        vector<int> scoreC = vector<int> (3,0);
+        vector<int> river = vector<int> (3,0);
+        vector<int> building = vector<int> (3,0);
+        vector<int> field = vector<int> (3,0);
+        vector<int> mt1 = vector<int> (3,0);
+        vector<int> mt2 = vector<int> (3,0);
+        vector<int> mt3 = vector<int> (3,0);
+        vector<int> t1 = vector<int> (3,0);
+        vector<int> t2 = vector<int> (3,0); 
+        vector<int> t3 = vector<int> (3,0);
+    };
+
+    vector<Stats> stats(players);
+    int turns = 0, turn_max = 0;
+
+    for(int k = 0; k < games; k++) {
+
+        //1 game
+        // 5 possible actions per turn: pickPool, pickCard, placeToken, placeAnchor, endTurn
+        // at minimum 4 mandatory decisions, picking the pool and placing 3 tokens (location for each)
+        // each decision is masked
+        // non-mandatory decisions have a 'skip' option
+        Game game;
+        init_game(game);
+        bool end_game = false;
+
+        vector<int> turn_order; // player turn order
+        for(int i = 0; i < players; i++)  turn_order.push_back(i);
+        shuffle(turn_order.begin(), turn_order.end(), rng);
+        
+        while(!end_game) {
+            for(int playerID : turn_order) {
+                Player &user = game.players[playerID];
+        
+                //AGENT IMPLEMENTATION GOES HERE
+        
+                //RANDOM AGENT:
+                // picks pool at random, always fills up card slots selecting at random, places anchors whenever able
+                // places tokens in random order and random tiles
+        
+                //pick pool
+                user.player_tokens = select_token_pool(game.tboard, game.tbag, rand_int(0,4));
+                user.tokens_picked = true;
+        
+                //one of three placeToken,placeAnchor,pickCard (masked decisions)
+                vector<int> t_order; // random token placement order
+                for(int i = 0; i < 3; i++)  t_order.push_back(i);
+                shuffle(t_order.begin(), t_order.end(), rng);
+
+                for(int t : t_order) {
+                    vector<int> mask(nodes);
+                    placement_mask(user.player_tokens[t], user.board_status, mask);
+                    vector<int> valid(0);
+                    for(int i = 0; i < nodes; i++) { if(mask[i])valid.push_back(i); }
+                    if(valid.empty()) {
+                        cout << "ERROR: valid placement for token " << t << " was empty, EXITING SIMULATION!\n";
+
+                        exit(1);
                     }
+                    int tile = valid[rand_int(0,valid.size()-1)]; //random token placement tile
+                    place_token(user.player_tokens[t], tile, user.board_status);
+                    for(auto &card : user.player_cards) update_anchor_positions(card, user.board_status,tile);
+        
+                    while(user.player_cards.size() != max_player_cards) {
+                        int draw_size = (max_card_board > game.card_deck.size() ? game.card_deck.size() : max_card_board);
+                        int i = rand_int(0,draw_size-1); //random card selection fill
+                        for(int n = 0; n < nodes; n++) update_anchor_positions(game.card_deck[i], user.board_status, n);
+                        user.player_cards.push_back(game.card_deck[i]);
+                        game.card_deck.erase(game.card_deck.begin()+i);
+                    }
+        
+                    //auto place possible anchors
+                    vector<int> completed;
+                    for(int j = 0; j < user.player_cards.size(); j++) {
+                        auto &card = user.player_cards[j];
+                        for(int i = 0; i < nodes; i++) {
+                            if(card.placement[i]) {
+                                user.board_status[i].animal=1;
+                                card.uses++;
+        
+                                //animal used up check
+                                if(card.uses == card.score.size()-1) {
+                                    user.complete_cards.push_back(card);
+                                    completed.push_back(j);
+                                }
+        
+                                for(auto &c : user.player_cards) update_anchor_positions(c, user.board_status, i);
+                            }        
+                        }
+                    }
+                    while(!completed.empty()) {
+                        user.player_cards.erase(user.player_cards.begin()+completed.back());
+                        completed.pop_back();
+                    }
+        
                 }
-    
-            }
-            user.player_tokens.clear();
-            user.tokens_picked = false;
-    
-            //end turn 
-            if(&game.players[playerID] == &game.players.back()) game.turn++;
+                user.player_tokens.clear();
+                user.tokens_picked = false;
+        
+                //end turn 
+                if(&game.players[playerID] == &game.players.back()) game.turn++;
 
-            int empty_tile = 0;
-            for(Tile t : user.board_status) if(t.state_id() == State::Empty) empty_tile++;
-            if(game.tbag.empty() || empty_tile < 3) end_game = true;
+                int empty_tile = 0;
+                for(Tile t : user.board_status) if(t.state_id() == State::Empty) empty_tile++;
+                if(game.tbag.empty() || empty_tile < 3) end_game = true;
+            }
+
         }
 
+        /*
+        //GAME PRINTOUT
+        clear_terminal();
+        cout << bold() << "\n__________________________________ GAME COMPLETE ___________________________________\n\n" << nofont();
+        cout << "Game length: " << game.turn << " turns\n\n";
+        for(int i = 0; i < game.players.size(); i++) print_player_score(game.players[i],i);
+        */
+
+        // SAVE THE GAME STATS
+        turns += game.turn;
+        turn_max = game.turn > turn_max ? game.turn : turn_max;
+        for(int i = 0; i < players; i++) {
+            Player user = game.players[i];
+            Stats &stat = stats[i];
+    
+            int t=0, m=0, b=0, f=0, r=0, a=0, total=0;
+            vector<int> tmp;
+            tmp = tree_score(user.board_status);
+            //MAX
+            stat.t1[1] = stat.t1[1] > tmp[0] ? stat.t1[1] : tmp[0];
+            stat.t2[1] = stat.t2[1] > tmp[1] ? stat.t2[1] : tmp[1];
+            stat.t3[1] = stat.t3[1] > tmp[2] ? stat.t3[1] : tmp[2];
+    
+            stat.t1[2] += tmp[0], stat.t2[2] += tmp[1], stat.t3[2] += tmp[2]; //SUM
+            for(int x : tmp) total += x;
+            
+            tmp = mountain_score(user.board_status);
+            //MAX
+            stat.mt1[1] = stat.mt1[1] > tmp[0] ? stat.mt1[1] : tmp[0];
+            stat.mt2[1] = stat.mt2[1] > tmp[1] ? stat.mt2[1] : tmp[1];
+            stat.mt3[1] = stat.mt3[1] > tmp[2] ? stat.mt3[1] : tmp[2];
+    
+            stat.mt1[2] += tmp[0], stat.mt2[2] += tmp[1], stat.mt3[2] += tmp[2]; //SUM
+            for(int x : tmp) total += x;
+    
+            b = building_score(user.board_status);
+            stat.building[1] = stat.building[1] > b ? stat.building[1] : b; //MAX
+            stat.building[2] += b; //SUM
+            
+            f = fields_score(user.board_status);
+            stat.field[1] = stat.field[1] > f ? stat.field[1] : f; //MAX
+            stat.field[2] += f; //SUM
+            total += f;
+    
+            r = river_score(user.board_status);
+            stat.river[1] = stat.river[1] > r ? stat.river[1] : r; //MAX
+            stat.river[2] += r; //SUM
+            total += r;
+    
+            for(auto card : user.complete_cards) a += card.score.back();
+            for(auto card : user.player_cards) a += card.score[card.uses];
+            stat.doneC[1] = stat.doneC[1] > user.complete_cards.size() ? stat.doneC[1] : user.complete_cards.size(); //MAX
+            stat.doneC[2] += user.complete_cards.size(); //SUM
+    
+            stat.scoreC[1] = stat.scoreC[1] > a ? stat.scoreC[1] : a; //MAX
+            stat.scoreC[2] += a; //SUM
+            total += a;
+
+            stat.singleGame[1] = stat.singleGame[1] > total ? stat.singleGame[1] : total; //MAX
+            stat.singleGame[2] += total; //SUM
+    
+        }
+
+
+        if (k % (games/100) == 0 || k == games - 1) {
+            print_progress(k + 1, games);
+        }
     }
 
-    //PRINTOUT
+    //calc the average
+    for(int i = 0; i < players; i++) {
+        Stats &stat = stats[i];
+        stat.singleGame[0] = stat.singleGame[2] / games;
+        stat.doneC[0] = stat.doneC[2] / games;
+        stat.scoreC[0] = stat.scoreC[2] / games;
+        stat.river[0] = stat.river[2] / games;
+        stat.building[0] = stat.building[2] / games;
+        stat.field[0] = stat.field[2] / games;
+        stat.mt1[0] = stat.mt1[2] / games;
+        stat.mt2[0] = stat.mt2[2] / games;
+        stat.mt3[0] = stat.mt3[2] / games;
+        stat.t1[0] = stat.t1[2] / games;
+        stat.t2[0] = stat.t2[2] / games;
+        stat.t3[0] = stat.t3[2] / games;
+    }
+
+    //SESSION PRINTOUT
+    // per card rundown?
+    // turns?
+
     clear_terminal();
-    cout << bold() << "\n__________________________________ GAME COMPLETE ___________________________________\n\n" << nofont();
-    cout << "Game length: " << game.turn << " turns\n\n";
-    for(int i = 0; i < game.players.size(); i++) print_player_score(game.players[i],i);
+    cout << bold() << "\n__________________________________ SESSION of " << games << " GAMES COMPLETE ___________________________________\n\n" << nofont();
+    cout << "AVG. TURNS: " << format_dec(to_string((float)turns/games)) << '\n';
+    cout << "MAX. TURNS: " << turn_max << '\n';
+    cout << "SUM. TURNS: " << turns << '\n';
+    for(int i = 0; i < players; i++) {
+        Stats &s = stats[i];
+        cout << "\nPLAYER " << i << ":\n\n";
+        cout << bold() << "      | GAME     | DONE C   | SCORE C  | RIVER    | BUILDING | FIELD    | MT.1     | MT.2     | MT.3     | T1       | T2       | T3       |\n" << nofont(); 
+
+        cout << bold() << "AVG.  |" << nofont() << ' ' << recenter(8,format_dec(to_string((float)s.singleGame[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.doneC[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.scoreC[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.river[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.building[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.field[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.mt1[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.mt2[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.mt3[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.t1[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.t2[2]/games))) << " |"
+            << ' ' << recenter(8,format_dec(to_string((float)s.t3[2]/games))) << " |"
+            << '\n';
+        cout << bold() << "MAX.  |" << nofont() << ' ' << recenter(8,to_string(s.singleGame[1])) << " |"
+            << ' ' << recenter(8,to_string(s.doneC[1])) << " |"
+            << ' ' << recenter(8,to_string(s.scoreC[1])) << " |"
+            << ' ' << recenter(8,to_string(s.river[1])) << " |"
+            << ' ' << recenter(8,to_string(s.building[1])) << " |"
+            << ' ' << recenter(8,to_string(s.field[1])) << " |"
+            << ' ' << recenter(8,to_string(s.mt1[1])) << " |"
+            << ' ' << recenter(8,to_string(s.mt2[1])) << " |"
+            << ' ' << recenter(8,to_string(s.mt3[1])) << " |"
+            << ' ' << recenter(8,to_string(s.t1[1])) << " |"
+            << ' ' << recenter(8,to_string(s.t2[1])) << " |"
+            << ' ' << recenter(8,to_string(s.t3[1])) << " |"
+            << '\n';
+        cout << bold() << "SUM.  |" << nofont() << ' ' << recenter(8,to_string(s.singleGame[2])) << " |"
+            << ' ' << recenter(8,to_string(s.doneC[2])) << " |"
+            << ' ' << recenter(8,to_string(s.scoreC[2])) << " |"
+            << ' ' << recenter(8,to_string(s.river[2])) << " |"
+            << ' ' << recenter(8,to_string(s.building[2])) << " |"
+            << ' ' << recenter(8,to_string(s.field[2])) << " |"
+            << ' ' << recenter(8,to_string(s.mt1[2])) << " |"
+            << ' ' << recenter(8,to_string(s.mt2[2])) << " |"
+            << ' ' << recenter(8,to_string(s.mt3[2])) << " |"
+            << ' ' << recenter(8,to_string(s.t1[2])) << " |"
+            << ' ' << recenter(8,to_string(s.t2[2])) << " |"
+            << ' ' << recenter(8,to_string(s.t3[2])) << " |"
+            << '\n';
+    }
+
+    cout << "\n\n";
+
+    //PLAYER 0:
+
+    //      | GAME     | DONE C   | SCORE C  | RIVER    | BUILDING | FIELD    | MT.1     | MT.2     | MT.3     | T1       | T2       | T3       |
+    //AVG.  | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 | 99999999 |
+    //MAX.  |          |          |          |          |          |          |          |          |          |          |          |          |
+    //SUM.  |
+    
+    //    | P0       | P1       | P2       | P3       |
+    //1st | 99999999 | 99999999 | 99999999 | 99999999 |
+    //2nd | X  |
+    //3rd | X  |
+    //4th | X  |
 
 }
 
@@ -1186,7 +1391,7 @@ void state_machine(vector<string> &in) {
         }
         
         case Menu::Simulation: {
-            simulate();
+            simulate(stoi(in[0]));
             cout  << "Press Enter to return to the Main Menu.\n";
             state = Menu::MainMenu;
             string input;

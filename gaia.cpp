@@ -50,8 +50,13 @@ void place_token(int token, int node, vector<Tile> &status) {
 
 // returns the top most token of the tile stack
 int skim_top(Tile t) { 
-    for(int x : t.stack) if(x != -1) return x;
-    return -1;
+    if(t.stack[0] == -1) return -1;
+    for(int i = 1; i < t.stack.size(); i++) {
+        if(t.stack[i] == -1) {
+            return t.stack[i-1];
+        } 
+    }
+    return t.stack.back();
 }
 
 // returns mask for valid token placement, mask needs proper size, but doesnt need to be fresh
